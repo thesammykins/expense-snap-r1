@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=240, initial-scale=1.0, user-scalable=no">
+    <title>Expense Snap - R1 Creation</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Expense Snap</h1>
+        </header>
+
+        <main id="content">
+            <div class="loading-initial">
+                <div class="spinner"></div>
+                <div>Loading...</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Core infrastructure -->
+    <script src="js/core/AppState.js"></script>
+    <script src="js/core/EventBus.js"></script>
+    <script src="js/core/ErrorBoundary.js"></script>
+    <script src="js/core/Router.js"></script>
+
+    <!-- Services -->
+    <script src="js/services/StorageService.js"></script>
+    <script src="js/services/LLMService.js"></script>
+    <script src="js/services/JournalService.js"></script>
+    <script src="js/services/CameraService.js"></script>
+    <script src="js/services/ExpenseService.js"></script>
+
+    <!-- Components -->
+    <script src="js/components/ProgressBar.js"></script>
+    <script src="js/components/VirtualList.js"></script>
+    <script src="js/components/LoadingSpinner.js"></script>
+
+    <!-- Screens -->
+    <script src="js/screens/HomeScreen.js"></script>
+    <script src="js/screens/CameraScreen.js"></script>
+    <script src="js/screens/ConfirmScreen.js"></script>
+    <script src="js/screens/HistoryScreen.js"></script>
+    <script src="js/screens/DetailScreen.js"></script>
+    <script src="js/screens/InsightsScreen.js"></script>
+
+    <!-- Bootstrap -->
+    <script src="js/app.js"></script>
+</body>
+</html>
