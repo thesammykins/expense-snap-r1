@@ -19,10 +19,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     const screens = new Map();
     screens.set('home', new HomeScreen());
     screens.set('camera', new CameraScreen());
+    screens.set('voice', new VoiceScreen());
     screens.set('confirm', new ConfirmScreen());
     screens.set('history', new HistoryScreen());
     screens.set('detail', new DetailScreen());
     screens.set('insights', new InsightsScreen());
+    screens.set('budget', new BudgetScreen());
+    screens.set('onboarding', new OnboardingScreen());
 
     // Initialize router
     router = new Router(appState, screens);
@@ -33,8 +36,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Load initial budget if needed
     await initializeBudget();
 
-    // Navigate to home screen
-    router.navigate('home');
+    // Check if onboarding is complete
+    const onboardingComplete = await storageService.getPreference('onboarding_completed');
+
+    // Navigate to appropriate screen
+    if (onboardingComplete) {
+        router.navigate('home');
+    } else {
+        router.navigate('onboarding');
+    }
 
     console.log('Expense Snap - Ready!');
 });

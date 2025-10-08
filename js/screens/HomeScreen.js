@@ -6,10 +6,12 @@ class HomeScreen {
             { id: 'camera', label: '📷 Scan Receipt' },
             { id: 'voice', label: '🎤 Voice Entry' },
             { id: 'history', label: '📋 View History' },
-            { id: 'insights', label: '📊 Insights' }
+            { id: 'insights', label: '📊 Insights' },
+            { id: 'budget', label: '⚙️ Budget Settings' }
         ];
         this.todayTotal = 0;
         this.budget = { daily: 200 };
+        this.syncStatus = { pending: 0 };
     }
 
     async onEnter() {
@@ -20,11 +22,24 @@ class HomeScreen {
 
         // Subscribe to expense updates
         this.unsubscribeExpense = eventBus.on('expense:created', () => this.loadData());
+
+        // Subscribe to journal sync status
+        this.unsubscribeSync = eventBus.on('journal:synced', () => this.updateSyncStatus());
+        this.unsubscribeSyncFailed = eventBus.on('journal:sync_failed', () => this.updateSyncStatus());
+
+        // Update sync status
+        this.updateSyncStatus();
     }
 
     onExit() {
         if (this.unsubscribeExpense) {
             this.unsubscribeExpense();
+        }
+        if (this.unsubscribeSync) {
+            this.unsubscribeSync();
+        }
+        if (this.unsubscribeSyncFailed) {
+            this.unsubscribeSyncFailed();
         }
     }
 
@@ -35,10 +50,32 @@ class HomeScreen {
 
             // Re-render if already mounted
             if (this.isMounted) {
-                this.render();
+                const content = document.getElementById('content');
+                if (content) {
+                    content.innerHTML = this.render();
+                    this.onMount();
+                }
             }
         } catch (error) {
             console.error('Error loading home data:', error);
+        }
+    }
+
+    updateSyncStatus() {
+        this.syncStatus = journalService.getSyncStatus();
+
+        // Update sync indicator if mounted
+        if (this.isMounted) {
+            const syncIndicator = document.querySelector('.sync-indicator');
+            if (syncIndicator) {
+                if (this.syncStatus.pending && this.syncStatus.queueLength > 0) {
+                    syncIndicator.textContent = `⏳ Syncing (${this.syncStatus.queueLength})`;
+                    syncIndicator.classList.add('syncing');
+                } else {
+                    syncIndicator.textContent = '✓ Synced';
+                    syncIndicator.classList.remove('syncing');
+                }
+            }
         }
     }
 
@@ -46,11 +83,17 @@ class HomeScreen {
         const budgetStatus = this.todayTotal < this.budget.daily * 0.7 ? 'good' :
                            this.todayTotal < this.budget.daily * 0.9 ? 'warning' : 'over';
 
+        const syncIndicatorText = this.syncStatus.pending && this.syncStatus.queueLength > 0
+            ? `⏳ Syncing (${this.syncStatus.queueLength})`
+            : '✓ Synced';
+        const syncIndicatorClass = this.syncStatus.pending ? 'syncing' : '';
+
         return `
             <div class="home-screen">
                 <div class="balance-section">
                     <h2 class="balance-label">TODAY</h2>
                     <div class="balance-amount">$${this.todayTotal.toFixed(2)}</div>
+                    <div class="sync-indicator ${syncIndicatorClass}">${syncIndicatorText}</div>
                 </div>
 
                 ${ProgressBar.render(this.todayTotal, this.budget.daily)}
@@ -107,6 +150,8 @@ class HomeScreen {
             if (idx === this.selectedOption) {
                 el.classList.add('selected');
                 el.querySelector('.option-icon').textContent = '▶';
+                // Ensure selected option scrolls into view
+                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } else {
                 el.classList.remove('selected');
                 el.querySelector('.option-icon').textContent = '○';

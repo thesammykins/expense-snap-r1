@@ -130,21 +130,46 @@ class LLMService {
     _parseResponse(type, data) {
         // Try to parse data.data first, then data.message
         let responseData;
+        let rawText = data.data || data.message;
 
-        if (data.data) {
-            try {
-                responseData = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
-            } catch (e) {
-                responseData = { raw: data.data };
-            }
-        } else if (data.message) {
-            try {
-                responseData = JSON.parse(data.message);
-            } catch (e) {
-                responseData = { raw: data.message };
-            }
-        } else {
+        console.log('LLM raw response:', rawText);
+
+        if (!rawText) {
             throw new Error('No data in LLM response');
+        }
+
+        // Try to extract JSON from markdown code blocks
+        if (typeof rawText === 'string') {
+            // Remove markdown code blocks: ```json ... ``` or ``` ... ```
+            const jsonMatch = rawText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+            if (jsonMatch) {
+                rawText = jsonMatch[1];
+                console.log('Extracted JSON from markdown:', rawText);
+            }
+        }
+
+        // Parse JSON
+        try {
+            responseData = typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
+        } catch (e) {
+            console.warn('Failed to parse as JSON, attempting to extract JSON object:', e);
+
+            // Try to find JSON object in the text
+            if (typeof rawText === 'string') {
+                const objectMatch = rawText.match(/\{[\s\S]*\}/);
+                if (objectMatch) {
+                    try {
+                        responseData = JSON.parse(objectMatch[0]);
+                        console.log('Extracted JSON object:', responseData);
+                    } catch (e2) {
+                        responseData = { raw: rawText };
+                    }
+                } else {
+                    responseData = { raw: rawText };
+                }
+            } else {
+                responseData = { raw: rawText };
+            }
         }
 
         // Type-specific validation
@@ -203,7 +228,9 @@ class LLMService {
 
         prompt += `
 
-Return ONLY valid JSON in this exact format:
+IMPORTANT: Respond with ONLY valid JSON. No markdown, no code blocks, no explanations.
+
+Required format:
 {
   "amount": "12.50",
   "merchant": "Store Name",
@@ -213,9 +240,9 @@ Return ONLY valid JSON in this exact format:
   "confidence": 0.9
 }
 
-Categories: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health, Bills, Other
+Valid categories: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health, Bills, Other
 
-Image data: ${imageBase64.substring(0, 100)}...`;
+Image data: ${imageBase64}`;
 
         return prompt;
     }
