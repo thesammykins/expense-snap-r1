@@ -97,6 +97,166 @@ git push origin main
 2. Check that PluginMessageHandler is available
 3. The app will show an error toast and offer retry/manual entry
 
+## How the QR Generator Works
+
+### Implementation Details
+
+The custom QR generator (`generate-qr.html`) uses the **qr-code-styling** library to create branded QR codes.
+
+#### Key Implementation Steps:
+
+1. **Include Required Library**
+```html
+<script src="https://unpkg.com/qr-code-styling@1.6.0-rc.1/lib/qr-code-styling.js"></script>
+```
+
+2. **Create JSON Payload**
+The QR code encodes a JSON object with R1 Creation metadata:
+```javascript
+const appData = {
+    title: "Expense Snap",
+    url: "https://thesammykins.github.io/expense-snap-r1/",
+    description: "Track expenses with camera scanning and AI insights",
+    iconUrl: "",
+    themeColor: "#00ff00"
+};
+const qrData = JSON.stringify(appData);
+```
+
+3. **Configure QR Code Styling**
+```javascript
+const qrCodeOptions = {
+    width: 320,
+    height: 320,
+    type: "canvas",
+    data: qrData,
+    margin: 10,
+    qrOptions: {
+        typeNumber: 0,
+        mode: "Byte",
+        errorCorrectionLevel: "M"  // Medium error correction
+    },
+    dotsOptions: {
+        color: "#000000",
+        type: "rounded"
+    },
+    backgroundOptions: {
+        color: "#ffffff"
+    },
+    cornersSquareOptions: {
+        color: "#00ff00",  // Green corners for branding
+        type: "extra-rounded"
+    },
+    cornersDotOptions: {
+        color: "#00ff00",
+        type: "dot"
+    }
+};
+```
+
+4. **Generate and Display**
+```javascript
+const qrCode = new QRCodeStyling(qrCodeOptions);
+qrCode.append(containerElement);
+```
+
+#### Download Functionality
+
+The download function adds a branded border and title:
+
+```javascript
+downloadQRCode() {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Size with padding
+    const size = 500;
+    const padding = 40;
+    canvas.width = size + (padding * 2);
+    canvas.height = size + (padding * 2) + 60;
+
+    // White background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Green border
+    ctx.strokeStyle = '#00ff00';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 70);
+
+    // Draw QR code
+    const qrCanvas = document.querySelector('#qrCode canvas');
+    ctx.drawImage(qrCanvas, padding, padding, size, size);
+
+    // Add title
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Expense Snap - R1 Creation', canvas.width / 2, canvas.height - 30);
+
+    // Download
+    const link = document.createElement('a');
+    link.download = 'expense-snap-qr-code.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+```
+
+### Creating QR Generator for Future Projects
+
+To create a similar QR generator for a new R1 Creation:
+
+1. **Copy the template:**
+   ```bash
+   cp generate-qr.html new-app-qr.html
+   ```
+
+2. **Update the app data:**
+   ```javascript
+   const appData = {
+       title: "Your App Name",
+       url: "https://username.github.io/your-app/",
+       description: "Your app description",
+       iconUrl: "",  // Optional: URL to app icon
+       themeColor: "#your-color"  // App brand color
+   };
+   ```
+
+3. **Customize branding:**
+   - Update page title and header
+   - Change color scheme in HTML/CSS
+   - Modify QR code corner colors in `cornersSquareOptions`
+   - Update feature list and installation steps
+
+4. **Deploy:**
+   ```bash
+   git add new-app-qr.html
+   git commit -m "Add QR generator for [App Name]"
+   git push origin main
+   ```
+
+5. **Access at:**
+   `https://username.github.io/your-app/new-app-qr.html`
+
+### QR Code Best Practices for R1
+
+- **Error Correction:** Use "M" (Medium) or "L" (Low) for R1 Creation metadata
+- **Size:** 300-400px is optimal for display and scanning
+- **Contrast:** Black on white provides best scan reliability
+- **Branding:** Use colored corners, not colored dots (reduces scan issues)
+- **Data Format:** Always encode as JSON string with R1 metadata structure
+- **Testing:** Test scan with actual R1 device, not just QR code readers
+
+### Reference Implementation
+
+See `/Users/samanthamyers/Development/creations-sdk/qr/final/` for the original Rabbit QR generator that this implementation is based on.
+
+**Key Files:**
+- `index.html` - Full-featured QR generator with form inputs
+- `js/app.js` - Complete implementation with URL parameter support
+
+The Expense Snap generator is a simplified, single-purpose version optimized for quick deployment.
+
 ## Security Note
 
 The app runs entirely on the R1 device. No data is sent to external servers except:
@@ -106,6 +266,12 @@ The app runs entirely on the R1 device. No data is sent to external servers exce
 All expense data is stored locally in the R1's browser storage.
 
 ---
+
+## Quick Reference
+
+**App URL:** https://thesammykins.github.io/expense-snap-r1/
+**QR Generator:** https://thesammykins.github.io/expense-snap-r1/generate-qr.html
+**Repository:** https://github.com/thesammykins/expense-snap-r1
 
 **Ready to scan!** 🎉
 
