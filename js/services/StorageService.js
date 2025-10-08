@@ -269,10 +269,30 @@ class StorageService {
         const serialized = JSON.stringify(value);
         const encoded = btoa(serialized);
 
-        if (typeof window.creationStorage !== 'undefined') {
-            return await window.creationStorage.plain.setItem(fullKey, encoded);
-        } else if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(fullKey, encoded);
+        try {
+            if (typeof window.creationStorage !== 'undefined') {
+                // R1 Creation Storage (asynchronous)
+                await window.creationStorage.plain.setItem(fullKey, encoded);
+                console.log(`[Storage] Saved to R1 storage: ${key}`);
+
+                // Verify write succeeded by reading back
+                const verified = await window.creationStorage.plain.getItem(fullKey);
+                if (!verified) {
+                    console.error(`[Storage] Verification failed for key: ${key}`);
+                    throw new Error('Storage write verification failed');
+                }
+                return true;
+            } else if (typeof localStorage !== 'undefined') {
+                // Browser localStorage (synchronous)
+                localStorage.setItem(fullKey, encoded);
+                console.log(`[Storage] Saved to localStorage: ${key}`);
+                return true;
+            } else {
+                throw new Error('No storage mechanism available');
+            }
+        } catch (error) {
+            console.error(`[Storage] Failed to save ${key}:`, error);
+            throw error;
         }
     }
 
@@ -280,19 +300,24 @@ class StorageService {
         const fullKey = this.STORAGE_PREFIX + key;
         let encoded;
 
-        if (typeof window.creationStorage !== 'undefined') {
-            encoded = await window.creationStorage.plain.getItem(fullKey);
-        } else if (typeof localStorage !== 'undefined') {
-            encoded = localStorage.getItem(fullKey);
-        }
-
-        if (!encoded) return null;
-
         try {
+            if (typeof window.creationStorage !== 'undefined') {
+                // R1 Creation Storage (asynchronous)
+                encoded = await window.creationStorage.plain.getItem(fullKey);
+                console.log(`[Storage] Retrieved from R1 storage: ${key} = ${encoded ? 'found' : 'null'}`);
+            } else if (typeof localStorage !== 'undefined') {
+                // Browser localStorage (synchronous)
+                encoded = localStorage.getItem(fullKey);
+                console.log(`[Storage] Retrieved from localStorage: ${key} = ${encoded ? 'found' : 'null'}`);
+            }
+
+            if (!encoded) return null;
+
             const decoded = atob(encoded);
-            return JSON.parse(decoded);
+            const parsed = JSON.parse(decoded);
+            return parsed;
         } catch (error) {
-            console.error('Storage decode error:', error);
+            console.error(`[Storage] Failed to retrieve ${key}:`, error);
             return null;
         }
     }

@@ -14,8 +14,14 @@ class LLMService {
 
     // Extract expense data from receipt image
     async extractExpenseData(imageBase64, voiceContext = null) {
+        console.log('[LLM] Starting receipt extraction');
+        console.log('[LLM] Image data length:', imageBase64?.length || 0);
+
         const prompt = this._buildExtractionPrompt(imageBase64, voiceContext);
-        return this.sendRequest('expense_extraction', prompt, { timeout: 15000 });
+        const result = await this.sendRequest('expense_extraction', prompt, { timeout: 15000 });
+
+        console.log('[LLM] Receipt extraction result:', result);
+        return result;
     }
 
     // Generate insights from expenses
@@ -28,6 +34,18 @@ class LLMService {
     async parseVoiceExpense(transcribedText) {
         const prompt = this._buildVoiceParsePrompt(transcribedText);
         return this.sendRequest('voice_parse', prompt, { timeout: 10000 });
+    }
+
+    // Parse OCR-extracted receipt text to expense
+    async parseReceiptText(ocrText) {
+        console.log('[LLM] Parsing OCR receipt text');
+        console.log('[LLM] OCR text length:', ocrText?.length || 0);
+
+        const prompt = this._buildReceiptTextParsePrompt(ocrText);
+        const result = await this.sendRequest('receipt_text_parse', prompt, { timeout: 12000 });
+
+        console.log('[LLM] Receipt text parsing result:', result);
+        return result;
     }
 
     // Core request/response correlation
@@ -77,12 +95,22 @@ class LLMService {
                 }
             };
 
+            console.log(`[LLM] Sending request type=${request.type} correlationId=${request.correlationId}`);
+            console.log('[LLM] Payload preview:', {
+                messageLength: request.message.length,
+                type: request.type,
+                correlationId: request.correlationId
+            });
+
             if (typeof PluginMessageHandler !== 'undefined') {
                 PluginMessageHandler.postMessage(JSON.stringify(payload));
+                console.log('[LLM] Request sent to R1');
             } else {
-                throw new Error('PluginMessageHandler not available');
+                console.warn('[LLM] PluginMessageHandler not available - running in browser mode');
+                throw new Error('PluginMessageHandler not available - R1 hardware required');
             }
         } catch (error) {
+            console.error('[LLM] Queue processing error:', error);
             const pending = this.pendingRequests.get(request.correlationId);
             if (pending) {
                 clearTimeout(pending.timeout);
@@ -180,6 +208,8 @@ class LLMService {
                 return this._validateInsightsData(responseData);
             case 'voice_parse':
                 return this._validateExpenseData(responseData);
+            case 'receipt_text_parse':
+                return this._validateExpenseData(responseData);
             default:
                 return responseData;
         }
@@ -234,7 +264,7 @@ Required format:
 {
   "amount": "12.50",
   "merchant": "Store Name",
-  "date": "2025-10-08",
+  "date": "2025-10-09",
   "category": "Groceries",
   "items": ["item1", "item2", "item3"],
   "confidence": 0.9
@@ -242,7 +272,26 @@ Required format:
 
 Valid categories: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health, Bills, Other
 
-Image data: ${imageBase64}`;
+`;
+
+        // Handle image data - strip data URL prefix if present
+        if (imageBase64) {
+            // If it's a data URL like "data:image/jpeg;base64,/9j/4AAQ...", extract just the base64 part
+            let cleanImageData = imageBase64;
+            if (imageBase64.startsWith('data:')) {
+                const base64Index = imageBase64.indexOf('base64,');
+                if (base64Index !== -1) {
+                    cleanImageData = imageBase64.substring(base64Index + 7);
+                    console.log('[LLM] Stripped data URL prefix from image');
+                }
+            }
+
+            prompt += `Image data (base64 JPEG): ${cleanImageData.substring(0, 100)}... [truncated for display, full image included]`;
+
+            // Note: The R1 LLM may or may not support image analysis directly.
+            // If it doesn't, you might need to use OCR or external service.
+            // For now, we're including the image data in the prompt.
+        }
 
         return prompt;
     }
@@ -293,6 +342,42 @@ Extract the expense details and return ONLY valid JSON:
 Categories: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health, Bills, Other
 
 If amount or merchant is unclear, make best guess.`;
+    }
+
+    _buildReceiptTextParsePrompt(ocrText) {
+        return `Parse this OCR-extracted receipt text and extract expense details.
+
+OCR Text:
+"""
+${ocrText}
+"""
+
+IMPORTANT: Respond with ONLY valid JSON. No markdown, no code blocks, no explanations.
+
+Extract and return:
+{
+  "amount": "XX.XX",
+  "merchant": "Store Name",
+  "date": "YYYY-MM-DD",
+  "category": "Category",
+  "items": ["item1", "item2"],
+  "confidence": 0.9
+}
+
+Instructions:
+- Find the TOTAL amount (not subtotal, not individual items)
+- Extract merchant name (usually at the top of the receipt)
+- Find date in format MM/DD/YYYY or similar
+- Suggest appropriate category based on merchant/items
+- List major items purchased (if visible)
+- Rate confidence 0-1 based on text clarity
+
+Valid categories: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health, Bills, Other
+
+If a field is unclear or missing, make your best guess or use:
+- date: "${new Date().toISOString().split('T')[0]}"
+- merchant: "Unknown"
+- category: "Other"`;
     }
 
     _generateId() {

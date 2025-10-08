@@ -66,7 +66,12 @@ class CameraScreen {
     }
 
     async handlePTTClick() {
-        if (this.isProcessing) return;
+        if (this.isProcessing) {
+            console.log('Camera: Already processing, ignoring click');
+            return;
+        }
+
+        console.log('Camera: PTT clicked - capturing receipt');
 
         await ErrorBoundary.wrap(
             async () => {
@@ -74,29 +79,86 @@ class CameraScreen {
                 this.rerender();
 
                 // Capture photo
+                console.log('Camera: Capturing photo...');
                 const imageBase64 = await cameraService.capturePhoto();
                 this.capturedImage = imageBase64;
 
-                // Extract expense data using LLM
-                const expense = await llmService.extractExpenseData(imageBase64);
+                console.log('Camera: Photo captured, extracting text with OCR...');
+
+                // Extract text using OCR
+                let ocrResult;
+                try {
+                    ocrResult = await ocrService.extractReceiptText(imageBase64);
+                    console.log('Camera: OCR complete, confidence:', ocrResult.confidence + '%');
+                    console.log('Camera: OCR text preview:', ocrResult.cleanedText.substring(0, 100) + '...');
+                } catch (ocrError) {
+                    console.warn('Camera: OCR failed, falling back to image-based LLM:', ocrError);
+                    // Fallback to direct image if OCR fails
+                    ocrResult = null;
+                }
+
+                // Parse extracted text with LLM (or use image if OCR failed)
+                console.log('Camera: Parsing with LLM...');
+                let expense;
+
+                if (ocrResult && ocrResult.cleanedText) {
+                    // Use OCR text for parsing (more reliable)
+                    expense = await llmService.parseReceiptText(ocrResult.cleanedText);
+                } else {
+                    // Fallback to image-based extraction
+                    console.log('Camera: Using image-based LLM extraction');
+                    expense = await llmService.extractExpenseData(imageBase64);
+                }
+
+                console.log('Camera: Expense extraction complete:', expense);
 
                 // Navigate to confirmation
                 router.navigate('confirm', {
                     expense,
                     source: 'camera',
-                    image: imageBase64
+                    image: imageBase64,
+                    ocrText: ocrResult?.cleanedText || null
                 });
             },
             (error) => {
                 this.isProcessing = false;
                 this.rerender();
-                ErrorBoundary.showErrorToast('Failed to process receipt');
-                // Offer fallback
+
+                console.error('Camera: Error processing receipt:', error);
+
+                const errorMessage = error.message || 'Failed to process receipt';
+                ErrorBoundary.showErrorToast(errorMessage);
+
+                // Offer fallback based on error type
                 setTimeout(() => {
-                    if (confirm('Try manual entry instead?')) {
-                        router.navigate('manual');
+                    if (error.message && error.message.includes('R1 hardware required')) {
+                        // LLM not available
+                        if (confirm('LLM service unavailable. Use manual entry?')) {
+                            router.navigate('home');
+                        }
+                    } else if (error.message && error.message.includes('OCR')) {
+                        // OCR specific error
+                        if (confirm('OCR failed. Try again or use manual entry?')) {
+                            // Reset for retry
+                            this.isProcessing = false;
+                            this.capturedImage = null;
+                            this.rerender();
+                        } else {
+                            router.back();
+                        }
+                    } else {
+                        // General error - offer retry or manual entry
+                        const retry = confirm('Receipt processing failed. Try again?');
+                        if (!retry) {
+                            router.back();
+                        } else {
+                            // Reset for retry
+                            this.isProcessing = false;
+                            this.capturedImage = null;
+                            this.rerender();
+                        }
                     }
-                }, 1000);
+                }, 500);
             },
             'camera_capture'
         );

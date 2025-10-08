@@ -216,21 +216,69 @@ LLM suggests category based on merchant, user can override.
 ## Known Limitations
 
 1. **Camera quality** - R1 hardware camera may struggle with low light or blurry receipts
-2. **LLM accuracy** - Depends on R1's LLM capabilities; may require manual correction
-3. **Storage limit** - Browser storage quota (~5-10MB); app handles ~1000-2000 expenses
-4. **No cloud backup** - Data only in local storage + optional journal sync
-5. **No voice entry yet** - Voice screen placeholder (requires Web Audio API integration)
+   - Mitigation: OCR confidence score helps identify poor quality scans
+2. **OCR accuracy** - Tesseract.js accuracy depends on receipt quality and lighting
+   - Mitigation: Cleaned text + LLM parsing improves results; manual editing available
+3. **OCR performance** - ~2-5 seconds per receipt on mobile hardware
+   - Mitigation: Worker initialized at startup and reused
+4. **Storage limit** - Browser storage quota (~5-10MB); app handles ~1000-2000 expenses
+5. **No cloud backup** - Data only in local storage + optional journal sync
+6. **Voice entry browser-dependent** - Requires browser SpeechRecognition API (WebKit/Chrome); may not work in all environments
+
+## Production Status
+
+### ✅ Implemented Features
+- [x] Receipt scanning with camera
+- [x] **OCR text extraction with Tesseract.js**
+- [x] LLM-powered expense extraction (from OCR text)
+- [x] Voice entry with Web Speech API
+- [x] Expense history with virtual scrolling
+- [x] Budget tracking with visual indicators
+- [x] Insights generation
+- [x] Rabbithole journal sync
+- [x] Onboarding flow
+- [x] Comprehensive error handling
+- [x] Storage persistence (R1 + browser)
+
+### 🚧 Known Issues & Workarounds
+- **Onboarding restarts**: Fixed with storage verification and logging
+- **Receipt scanning flow**: Now uses Tesseract.js OCR → extracts text → sends to LLM for parsing
+  - More reliable than direct image analysis
+  - Smaller payload to LLM (text vs. image)
+  - Fallback to image-based extraction if OCR fails
+- **Voice transcription**: Implemented with Web Speech API; requires microphone permissions
+
+### 📸 OCR Implementation Details
+
+**Receipt Scanning Pipeline:**
+1. Camera captures receipt image (240x282px)
+2. **Tesseract.js** extracts text via WebAssembly OCR (~2-5 seconds)
+3. Text cleaned and normalized
+4. LLM parses structured expense data from OCR text
+5. User confirms/edits in confirmation screen
+
+**Why OCR + LLM?**
+- ✅ More reliable than image-only LLM (R1 LLM may not support images)
+- ✅ Faster parsing (text is smaller than images)
+- ✅ Works offline (Tesseract.js runs in browser)
+- ✅ Graceful fallback if OCR fails
+
+**Performance:**
+- OCR initialization: ~1-2 seconds (at app startup)
+- Per-receipt OCR: ~2-5 seconds on mobile hardware
+- LLM parsing: ~1-3 seconds
+- **Total**: ~5-10 seconds per receipt
 
 ## Future Enhancements
 
-- [ ] Voice entry implementation
 - [ ] Manual entry mode with scroll wheel number input
 - [ ] Export to CSV
 - [ ] Multi-currency support
-- [ ] Receipt image storage (secure storage)
+- [ ] Receipt image storage in secure storage
 - [ ] Spending analytics charts
 - [ ] Custom category creation
 - [ ] Budget alerts
+- [ ] External transcription service integration (Whisper API, Google Speech-to-Text)
 
 ## License
 

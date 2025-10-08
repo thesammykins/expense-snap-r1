@@ -15,6 +15,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     const isR1Plugin = typeof PluginMessageHandler !== 'undefined';
     console.log('Running as R1 Creation:', isR1Plugin);
 
+    // Initialize OCR service (async, non-blocking)
+    console.log('Initializing OCR service...');
+    ocrService.initialize().catch(err => {
+        console.warn('OCR initialization failed (non-critical):', err);
+    });
+
     // Initialize screens
     const screens = new Map();
     screens.set('home', new HomeScreen());
@@ -199,6 +205,8 @@ window.expenseApp = {
         llm: llmService,
         journal: journalService,
         camera: cameraService,
+        voice: voiceService,
+        ocr: ocrService,
         expense: expenseService
     },
     version: '1.0.0'

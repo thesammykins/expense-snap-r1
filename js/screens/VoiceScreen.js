@@ -86,21 +86,42 @@ class VoiceScreen {
         console.log('Voice: Long press - cancelling');
 
         if (this.isRecording) {
+            // Cancel the recording
             this.isRecording = false;
             if (this.timerInterval) {
                 clearInterval(this.timerInterval);
             }
+
+            // Cancel voice service recording
+            voiceService.cancelRecording();
+
             this.rerender();
         } else {
             router.back();
         }
     }
 
-    startRecording() {
+    async startRecording() {
         console.log('Voice: Starting recording');
-        this.isRecording = true;
-        this.recordingStartTime = Date.now();
-        this.rerender();
+
+        try {
+            // Start speech recognition using VoiceService
+            await voiceService.startContinuousRecognition();
+
+            this.isRecording = true;
+            this.recordingStartTime = Date.now();
+            this.rerender();
+        } catch (error) {
+            console.error('Voice: Failed to start recording:', error);
+            ErrorBoundary.showErrorToast('Microphone access required for voice entry');
+
+            // Offer fallback
+            setTimeout(() => {
+                if (confirm('Would you like to use manual entry instead?')) {
+                    router.navigate('home');
+                }
+            }, 500);
+        }
     }
 
     async stopRecording() {
@@ -111,63 +132,52 @@ class VoiceScreen {
             clearInterval(this.timerInterval);
         }
 
-        // In a real R1 environment, the voice transcription would be handled
-        // by the R1 system. For now, we'll simulate with a prompt to the LLM.
-
         await ErrorBoundary.wrap(
             async () => {
                 this.isProcessing = true;
                 this.rerender();
 
-                // Note: In the actual R1 environment, you would get transcribed text
-                // from the device's voice recognition system. This is a placeholder
-                // that uses LLM to parse a simulated voice input.
+                // Get transcribed text from VoiceService
+                const transcribedText = await voiceService.stopContinuousRecognition();
 
-                // For testing without R1 hardware, we'll show an error
-                if (typeof PluginMessageHandler === 'undefined') {
-                    throw new Error('Voice recording requires R1 hardware');
-                }
-
-                // Send request for voice transcription + parsing
-                // The R1 system should provide transcribed text
-                const transcribedText = await this.getVoiceTranscription();
+                console.log('Voice: Transcribed text:', transcribedText);
 
                 if (!transcribedText || transcribedText.trim() === '') {
-                    throw new Error('No voice input detected');
+                    throw new Error('No speech detected. Please try again.');
                 }
 
-                // Parse the transcribed text to extract expense data
+                // Parse the transcribed text to extract expense data using LLM
                 const expense = await llmService.parseVoiceExpense(transcribedText);
 
                 // Navigate to confirmation
                 router.navigate('confirm', {
                     expense,
-                    source: 'voice'
+                    source: 'voice',
+                    transcription: transcribedText
                 });
             },
             (error) => {
                 this.isProcessing = false;
                 this.rerender();
-                ErrorBoundary.showErrorToast(error.message || 'Failed to process voice input');
+
+                const errorMessage = error.message || 'Failed to process voice input';
+                console.error('Voice: Error processing voice input:', errorMessage);
+                ErrorBoundary.showErrorToast(errorMessage);
+
+                // Offer to retry or go back
+                setTimeout(() => {
+                    if (confirm('Voice entry failed. Try again?')) {
+                        // Reset state for retry
+                        this.isProcessing = false;
+                        this.isRecording = false;
+                        this.rerender();
+                    } else {
+                        router.back();
+                    }
+                }, 500);
             },
             'voice_entry'
         );
-    }
-
-    async getVoiceTranscription() {
-        // In the real R1 environment, this would interface with the device's
-        // voice recognition system. For now, this is a placeholder.
-
-        // The R1 device should automatically transcribe PTT voice input
-        // and make it available through a callback or event.
-
-        // For testing purposes, return a simulated transcription
-        return new Promise((resolve, reject) => {
-            // This would be replaced with actual R1 voice API
-            setTimeout(() => {
-                reject(new Error('Voice transcription not yet implemented for browser testing'));
-            }, 1000);
-        });
     }
 
     startTimer() {
