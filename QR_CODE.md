@@ -10,7 +10,15 @@ The app is now deployed and accessible via GitHub Pages. It may take 1-2 minutes
 
 ## How to Add to R1 Device
 
-### Option 1: Use Rabbit's QR Generator (Recommended)
+### Option 1: Use Built-in QR Generator (Easiest!)
+**🎯 Direct Link: https://thesammykins.github.io/expense-snap-r1/generate-qr.html**
+
+1. Open the link above in any browser
+2. Click "🎨 Generate QR Code"
+3. Scan the QR code with your R1 device
+4. Done! The app will load on your R1
+
+### Option 2: Use Rabbit's QR Generator
 1. Visit: https://www.rabbit.tech/qr or use the QR generator from the creations-sdk/qr folder
 2. Enter the GitHub Pages URL: `https://thesammykins.github.io/expense-snap-r1/`
 3. Add a title: "Expense Snap"
@@ -18,7 +26,7 @@ The app is now deployed and accessible via GitHub Pages. It may take 1-2 minutes
 5. Generate the QR code
 6. Scan with your R1 device
 
-### Option 2: Direct QR Code Generation
+### Option 3: Direct QR Code Generation
 You can use any QR code generator with this URL:
 ```
 https://thesammykins.github.io/expense-snap-r1/
